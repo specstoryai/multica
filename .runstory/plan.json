@@ -1,0 +1,128 @@
+{
+  "schema": "runstory.plan/3",
+  "kind": "web",
+  "root": "apps/web",
+  "setup": {
+    "services": {
+      "postgresql": {
+        "url_env": [
+          "DATABASE_URL"
+        ]
+      }
+    },
+    "generate_env": [
+      "JWT_SECRET"
+    ],
+    "commands": [
+      {
+        "root": "apps/web",
+        "argv": [
+          "corepack",
+          "pnpm",
+          "run",
+          "runstory:toolchain"
+        ],
+        "timeout_s": 300
+      },
+      {
+        "root": "apps/web",
+        "argv": [
+          "corepack",
+          "pnpm",
+          "run",
+          "runstory:build-api"
+        ],
+        "timeout_s": 600
+      },
+      {
+        "root": "apps/web",
+        "argv": [
+          "corepack",
+          "pnpm",
+          "run",
+          "runstory:migrate"
+        ],
+        "timeout_s": 300
+      }
+    ]
+  },
+  "install": {
+    "command": [
+      "corepack",
+      "pnpm",
+      "install",
+      "--frozen-lockfile"
+    ],
+    "from": {
+      "file": "apps/web/package.json",
+      "line": 1,
+      "text": "package.json with no lockfile"
+    },
+    "state": "derived"
+  },
+  "build": {
+    "command": [
+      "corepack",
+      "pnpm",
+      "run",
+      "build"
+    ],
+    "from": {
+      "file": "apps/web/package.json",
+      "line": 8,
+      "text": "\"build\": \"next build --webpack\""
+    },
+    "state": "derived"
+  },
+  "test": {
+    "command": [
+      "corepack",
+      "pnpm",
+      "run",
+      "test"
+    ],
+    "from": {
+      "file": "apps/web/package.json",
+      "line": 12,
+      "text": "\"test\": \"vitest run\""
+    },
+    "state": "derived"
+  },
+  "start": {
+    "command": [
+      "corepack",
+      "pnpm",
+      "run",
+      "runstory:start"
+    ],
+    "port": 3000,
+    "health": "/health",
+    "from": {
+      "file": "apps/web/package.json",
+      "line": 10,
+      "text": "\"runstory:start\": \"bash ../../scripts/runstory/start.sh\""
+    },
+    "state": "pinned"
+  },
+  "why": [
+    {
+      "file": "apps/web/next.config.ts",
+      "line": 1,
+      "says": "a web framework config file"
+    }
+  ],
+  "fingerprint": {
+    "files": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/desktop-smoke.yml",
+      ".github/workflows/mobile-verify.yml",
+      ".github/workflows/openclaw-config-smoke.yml",
+      ".github/workflows/release.yml",
+      ".github/workflows/ui-performance.yml",
+      ".goreleaser.yml",
+      "package.json",
+      "pnpm-lock.yaml"
+    ],
+    "sha256": "2450f7fa3bbf4f88825592654337a15238bea12038f0cd9204b99e4c8626cb65"
+  }
+}

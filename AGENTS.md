@@ -125,3 +125,43 @@ Workspace-scoped queries filter by `workspace_id`; membership gates access and `
 - Do not add internal compatibility shims, dual writes, fallback paths, or legacy adapters unless requested. This does not relax API response compatibility above.
 - New global pre-workspace routes use a single word or `/{noun}/{verb}`, not hyphenated root names. Update `server/internal/handler/reserved_slugs.json`, run `pnpm generate:reserved-slugs`, and commit `packages/core/paths/reserved-slugs.ts` when changing reserved slugs.
 - Use atomic conventional commits and the repository PR template. For releases, follow [.github/RELEASING.md](.github/RELEASING.md); default to a patch bump unless specified otherwise.
+
+## runstory
+
+runstory runs the software in each commit in the background. It never blocks a
+commit and it never holds you up. What it finds goes into one list for this
+repository at `.runstory/findings.json`.
+
+Before you say a job is done, read the open findings. Run `runstory findings`,
+or `runstory findings --json` for the typed list, or call the runstory_findings
+tool when runstory's MCP server is connected.
+
+Close every open finding in one of two ways.
+
+- Fix the defect and commit it. A later run that no longer produces the finding
+  closes it and records the commit that fixed it.
+- Say in writing that it no longer applies. Call the runstory_acknowledge tool
+  with the finding id and the reason. A person reads that reason, so say what
+  you checked.
+
+A finding is addressed to the commit it was found on and not to HEAD, so a
+finding from six commits ago is still worth closing.
+
+The typed list carries a `staleness` block beside the findings. It is one
+sentence per finding from a reading of the git diff since the commit it was found
+on, and it is a presumption and never a closure. A word of `probably_gone`
+says the code the finding names has changed, which is where to look first and not
+a reason to skip it: on real history that reading was wrong often, so read the
+code before you decide.
+
+Do not run a repair script on this machine. A repair script is evidence for a
+sandbox. `runstory verify --only-failed`, which is what the runstory_verify
+tool runs, creates a fresh sandbox, checks out the commit each finding was last
+seen on, runs the repair scripts there and reports what they did. That run is the
+only thing that closes a finding as stale, and it executes nothing here.
+
+If you have looked and a finding no longer applies, say so in writing with
+`runstory findings acknowledge <id> --reason "..."` or the runstory_acknowledge
+tool. An acknowledgement is the one close that rests on your word rather than on
+a run, so a later run that produces the same defect reopens the finding and keeps
+your reason beside it.

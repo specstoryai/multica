@@ -79,3 +79,13 @@ data/
 __pycache__/
 *.pyc
 perf-report/
+# runstory: per machine state under .runstory/state/, the last failed dispatch in .runstory/dispatch.last and the delivered values in .runstory/env. .runstory/findings.json and .runstory/repro/ are NOT ignored, because the findings queue belongs to the branch.
+.runstory/runs/
+.runstory/state/
+.runstory/dispatch.last
+.runstory/findings.json.lock
+.runstory/.findings.json.tmp-*
+.runstory/env
+
+# Runstory sandbox toolchain and Go caches (scripts/runstory)
+.cache/runstory/

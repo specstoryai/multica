@@ -1,0 +1,5 @@
+scope_selected = true
+# runstory.toml, written by `runstory init`.
+# It carries only kind and root, two values, never a command.
+kind = "web"
+root = "apps/web"

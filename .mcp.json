@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "runstory": {
+      "args": [
+        "mcp"
+      ],
+      "command": "/work/runstory/bin/runstory",
+      "type": "stdio"
+    }
+  }
+}

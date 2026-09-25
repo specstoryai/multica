@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "stop": [
+      {
+        "command": "/work/runstory/bin/runstory hook stop --agent cursor"
+      }
+    ]
+  },
+  "version": 1
+}
