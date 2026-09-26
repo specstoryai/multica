@@ -9,6 +9,8 @@
 # then pilot). So: an API that is already healthy on its port is reused rather
 # than fought over, and this script stays the parent of both children and
 # forwards SIGTERM/SIGINT to them, so stopping it stops everything it started.
+# DOCS_URL points /docs at the public docs site so the landing page's docs links
+# resolve instead of 404ing in a sandbox that has no docs build.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,7 +65,7 @@ fi
 echo "runstory: API healthy. Sign in with any email and verification code 888888."
 
 echo "runstory: starting web on :$web_port"
-( cd "$repo/apps/web" && exec env REMOTE_API_URL="http://127.0.0.1:$api_port" NEXT_PUBLIC_API_URL="" NEXT_PUBLIC_WS_URL="" HOSTNAME=0.0.0.0 node_modules/.bin/next start --port "$web_port" ) &
+( cd "$repo/apps/web" && exec env REMOTE_API_URL="http://127.0.0.1:$api_port" DOCS_URL="${MULTICA_RUNSTORY_DOCS_URL:-https://multica.ai}" NEXT_PUBLIC_API_URL="" NEXT_PUBLIC_WS_URL="" HOSTNAME=0.0.0.0 node_modules/.bin/next start --port "$web_port" ) &
 web_pid=$!
 
 # Stay up while both run; end when either ends, taking the other with it.

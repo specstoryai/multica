@@ -447,7 +447,7 @@ function AutonomousVisual() {
               <Bot className="h-3 w-3" />
             </div>
             <div className="flex items-center gap-1.5 text-caption font-medium">
-              <Loader2 className="h-3 w-3 animate-spin text-info" />
+              <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none text-info" />
               Agent is working
             </div>
             <span className="ml-auto text-caption tabular-nums text-muted-foreground">7m 17s</span>
@@ -515,7 +515,7 @@ function AutonomousVisual() {
                 {task.status === "completed" ? (
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
                 ) : (
-                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-info" />
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin motion-reduce:animate-none text-info" />
                 )}
                 <span className={task.status === "running" ? "font-medium" : "text-muted-foreground"}>
                   {task.title}
