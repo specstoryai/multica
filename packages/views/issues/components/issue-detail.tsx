@@ -151,6 +151,7 @@ import { useIssueDetailScrollRestore } from "../hooks/use-issue-detail-scroll-re
 import { useInPageFind } from "../hooks/use-in-page-find";
 import { useStickyComposer } from "../hooks/use-sticky-composer";
 import { FindBar } from "./find-bar";
+import { JumpToLatestButton } from "./jump-to-latest";
 import {
   AnimatedRightSidebar,
   getAnimatedRightSidebarInitialOpen,
@@ -2887,6 +2888,15 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
             className={cn("absolute top-14 z-30", isMobile ? "right-4" : "right-10")}
           />
         )}
+        {/* Jump-to-latest: same parent as the find bar, for the same reasons.
+            Hidden at rest; a scroll that leaves the timeline's end off screen
+            reveals it near the pointer (desktop) or bottom-centre (narrow or
+            touch), and it fades once scrolling goes idle. */}
+        <JumpToLatestButton
+          container={scrollContainerEl}
+          composerRef={composerRef}
+          stickyComposer={stickyComposer}
+        />
         <BreadcrumbHeader
           leading={leadingAction}
           segments={breadcrumbSegments}

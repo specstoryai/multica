@@ -466,6 +466,7 @@
       "next": "次の一致",
       "close": "検索を閉じる"
     },
+    "jump_to_latest": "最新へ移動",
     "update_failed": "タスクを更新できませんでした",
     "link_copied": "リンクをコピーしました",
     "link_copy_failed": "リンクをコピーできませんでした",

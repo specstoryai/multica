@@ -1,0 +1,192 @@
+"use client";
+
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowDown } from "lucide-react";
+import { Button } from "@multica/ui/components/ui/button";
+import { useIsMobile } from "@multica/ui/hooks/use-mobile";
+import { cn } from "@multica/ui/lib/utils";
+import { useT } from "../../i18n";
+import {
+  computePlacement,
+  HIDE_AFTER_IDLE_MS,
+  shouldReveal,
+  type PlacementMode,
+} from "./jump-to-latest-state";
+
+interface JumpToLatestButtonProps {
+  /** The issue detail scroll viewport. Null until it mounts. */
+  container: HTMLElement | null;
+  /** The comment composer; its height is kept clear when it is pinned. */
+  composerRef: React.RefObject<HTMLElement | null>;
+  /** Whether the composer is pinned to the viewport's bottom edge. */
+  stickyComposer: boolean;
+  /** Extra classes for the positioned wrapper. */
+  className?: string;
+}
+
+/**
+ * Floating "jump to latest" control for the issue timeline.
+ *
+ * Hidden at rest. A scroll that leaves the end of the timeline off screen
+ * reveals it; it fades out once scrolling has been idle for a moment, or as
+ * soon as the end is on screen, so it never sits over the content. With a
+ * mouse it appears just below-right of the cursor, where the hand already is;
+ * on a narrow viewport or a coarse pointer it appears centred near the bottom.
+ * Hover or focus holds it visible.
+ *
+ * Positioned absolutely inside the content column (the same parent as the
+ * find bar) rather than inside the scroller, so it does not move with the
+ * content and its own text is not walked by find-in-issue.
+ */
+export function JumpToLatestButton({
+  container,
+  composerRef,
+  stickyComposer,
+  className,
+}: JumpToLatestButtonProps) {
+  const { t } = useT("issues");
+  const isMobile = useIsMobile();
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdRef = useRef(false);
+  const [visible, setVisible] = useState(false);
+  const [placement, setPlacement] = useState<{ left: number; top: number } | null>(null);
+
+  const mode: PlacementMode = isMobile || hasCoarsePointer() ? "bottom" : "pointer";
+
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+  }, []);
+
+  const armIdleTimer = useCallback(() => {
+    clearIdleTimer();
+    idleTimerRef.current = setTimeout(() => {
+      idleTimerRef.current = null;
+      if (!holdRef.current) setVisible(false);
+    }, HIDE_AFTER_IDLE_MS);
+  }, [clearIdleTimer]);
+
+  const place = useCallback(() => {
+    const wrapper = wrapperRef.current;
+    if (!container || !wrapper) return;
+    const parent = wrapper.offsetParent as HTMLElement | null;
+    const origin = parent?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const c = container.getBoundingClientRect();
+    const reservedBottom = stickyComposer
+      ? composerRef.current?.getBoundingClientRect().height ?? 0
+      : 0;
+    const size = {
+      width: wrapper.offsetWidth || 36,
+      height: wrapper.offsetHeight || 36,
+    };
+    const pointer = pointerRef.current
+      ? { x: pointerRef.current.x - origin.left, y: pointerRef.current.y - origin.top }
+      : null;
+    setPlacement(
+      computePlacement({
+        mode,
+        viewport: {
+          left: c.left - origin.left,
+          top: c.top - origin.top,
+          width: c.width,
+          height: c.height,
+        },
+        pointer,
+        size,
+        reservedBottom,
+      }),
+    );
+  }, [container, composerRef, mode, stickyComposer]);
+
+  // Scroll reveals; idle hides; reaching the end hides at once.
+  useEffect(() => {
+    if (!container) return;
+    const onScroll = () => {
+      if (!shouldReveal(container)) {
+        clearIdleTimer();
+        setVisible(false);
+        return;
+      }
+      setVisible(true);
+      place();
+      armIdleTimer();
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      pointerRef.current = { x: e.clientX, y: e.clientY };
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+    container.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      container.removeEventListener("pointermove", onPointerMove);
+      clearIdleTimer();
+    };
+  }, [container, place, armIdleTimer, clearIdleTimer]);
+
+  // Measure once the control has a layout, so the first reveal is placed with
+  // its real size rather than the fallback.
+  useLayoutEffect(() => {
+    if (visible) place();
+  }, [visible, place]);
+
+  const jump = useCallback(() => {
+    if (!container) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    container.scrollTo({ top: container.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+    clearIdleTimer();
+    setVisible(false);
+  }, [container, clearIdleTimer]);
+
+  const hold = useCallback(() => {
+    holdRef.current = true;
+    clearIdleTimer();
+  }, [clearIdleTimer]);
+
+  const release = useCallback(() => {
+    holdRef.current = false;
+    if (visible) armIdleTimer();
+  }, [visible, armIdleTimer]);
+
+  const label = t(($) => $.detail.jump_to_latest);
+
+  return (
+    <div
+      ref={wrapperRef}
+      data-testid="jump-to-latest"
+      data-state={visible ? "visible" : "hidden"}
+      data-placement={mode}
+      aria-hidden={!visible}
+      className={cn(
+        "absolute z-30 transition-opacity duration-200 motion-reduce:transition-none",
+        visible ? "opacity-100" : "pointer-events-none opacity-0",
+        className,
+      )}
+      style={placement ? { left: placement.left, top: placement.top } : { left: -9999, top: -9999 }}
+      onPointerEnter={hold}
+      onPointerLeave={release}
+      onFocus={hold}
+      onBlur={release}
+    >
+      <Button
+        type="button"
+        variant="secondary"
+        size="icon-sm"
+        aria-label={label}
+        title={label}
+        tabIndex={visible ? 0 : -1}
+        className="rounded-full shadow-md"
+        onClick={jump}
+      >
+        <ArrowDown />
+      </Button>
+    </div>
+  );
+}
+
+function hasCoarsePointer(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+}
