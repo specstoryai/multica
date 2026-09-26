@@ -34,6 +34,7 @@ scripts/ensure-postgres.sh:generic-password:19
 scripts/init-worktree-env.sh:generic-password:29
 scripts/install.test.sh:generic-credential-uri:271
 scripts/install.test.sh:generic-password:270
+scripts/runstory/README.md:generic-credential-uri:21
 scripts/worktree-db.test.sh:generic-credential-uri:100
 scripts/worktree-db.test.sh:generic-credential-uri:135
 scripts/worktree-db.test.sh:generic-credential-uri:39
