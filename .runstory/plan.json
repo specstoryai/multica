@@ -51,28 +51,30 @@
       "corepack",
       "pnpm",
       "install",
-      "--frozen-lockfile"
+      "--frozen-lockfile",
+      "--filter",
+      "@multica/web..."
     ],
     "from": {
-      "file": "apps/web/package.json",
+      "file": "scripts/runstory/README.md",
       "line": 1,
-      "text": "package.json with no lockfile"
+      "text": "pinned: install only apps/web and its workspace dependencies"
     },
-    "state": "derived"
+    "state": "pinned"
   },
   "build": {
     "command": [
       "corepack",
       "pnpm",
       "run",
-      "build"
+      "runstory:build"
     ],
     "from": {
       "file": "apps/web/package.json",
-      "line": 8,
-      "text": "\"build\": \"next build --webpack\""
+      "line": 10,
+      "text": "\"runstory:build\": \"next build\""
     },
-    "state": "derived"
+    "state": "pinned"
   },
   "test": {
     "command": [

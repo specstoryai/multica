@@ -7,6 +7,7 @@
     "dev": "sh -c 'next dev --webpack --port \"${FRONTEND_PORT:-3000}\"'",
     "build": "next build --webpack",
     "start": "next start",
+    "runstory:build": "MULTICA_LOW_MEMORY_BUILD=1 next build",
     "runstory:toolchain": "bash ../../scripts/runstory/setup.sh toolchain",
     "runstory:build-api": "bash ../../scripts/runstory/setup.sh build",
     "runstory:migrate": "bash ../../scripts/runstory/setup.sh migrate",

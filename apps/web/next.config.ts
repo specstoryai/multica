@@ -44,6 +44,24 @@ const nextConfig: NextConfig = {
   ...(allowedDevOrigins && allowedDevOrigins.length > 0
     ? { allowedDevOrigins }
     : {}),
+  // Opt-in for memory-constrained CI sandboxes such as Runstory (4 GiB shared
+  // with PostgreSQL and the API). Measured on this app: the Turbopack compile
+  // peaks near 3 GB and the in-build TypeScript pass adds another 1.9 GB on
+  // top of it, which is what tips a 4 GiB sandbox over. So: skip the type
+  // check here (`pnpm typecheck` owns it), enable webpack's memory
+  // optimisations, and generate static pages from one worker instead of
+  // `os.cpus().length - 1`. Off by default; production builds are unchanged.
+  ...(process.env.MULTICA_LOW_MEMORY_BUILD === "1"
+    ? {
+        typescript: { ignoreBuildErrors: true },
+        experimental: {
+          cpus: 1,
+          staticGenerationMaxConcurrency: 1,
+          staticGenerationMinPagesPerWorker: 100,
+          webpackMemoryOptimizations: true,
+        },
+      }
+    : {}),
   images: {
     formats: ["image/avif", "image/webp"],
     qualities: [75, 80, 85],
