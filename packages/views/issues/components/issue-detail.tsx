@@ -151,7 +151,7 @@ import { useIssueDetailScrollRestore } from "../hooks/use-issue-detail-scroll-re
 import { useInPageFind } from "../hooks/use-in-page-find";
 import { useStickyComposer } from "../hooks/use-sticky-composer";
 import { FindBar } from "./find-bar";
-import { JumpToLatestButton } from "./jump-to-latest";
+import { JumpToLatestButton, settleScrollAtEnd } from "./jump-to-latest";
 import {
   AnimatedRightSidebar,
   getAnimatedRightSidebarInitialOpen,
@@ -1793,6 +1793,36 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     };
   }, [pendingPostedCommentId, items, replyToRoot, isFlatTimeline]);
 
+  // Jump-to-latest: in Virtuoso mode ask it for the last row aligned to the
+  // end (offset by the pinned composer), then settle on the scroll container.
+  // The settle loop matters: rows below the viewport render at estimated
+  // heights and grow as they are measured on the way down, so a single jump
+  // aims at a height that is stale by the time it lands (Runstory finding
+  // f-f17b2c0c70c5: a 30-comment thread landed ~1100px short). Flat mode has
+  // no Virtuoso and settles directly.
+  const settleAtEndRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => settleAtEndRef.current?.(), []);
+  const jumpToLatest = useCallback(() => {
+    const container = scrollContainerEl;
+    if (!container) return;
+    settleAtEndRef.current?.();
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!isFlatTimeline && virtuosoRef.current && items.length > 0) {
+      const composerHeight = stickyComposer
+        ? composerRef.current?.getBoundingClientRect().height ?? 0
+        : 0;
+      virtuosoRef.current.scrollToIndex({
+        index: items.length - 1,
+        align: "end",
+        offset: composerHeight,
+        behavior: reduced ? "auto" : "smooth",
+      });
+    } else {
+      container.scrollTo({ top: container.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+    }
+    settleAtEndRef.current = settleScrollAtEnd(container);
+  }, [scrollContainerEl, isFlatTimeline, items.length, stickyComposer]);
+
   // Flat mode (find bar / deep link) has no Virtuoso, so drive scrollTop by
   // hand: align the row's bottom to the composer's top edge. The comment's
   // async layout (markdown, code highlight, images) keeps shifting its height,
@@ -2896,6 +2926,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
           container={scrollContainerEl}
           composerRef={composerRef}
           stickyComposer={stickyComposer}
+          onJump={jumpToLatest}
         />
         <BreadcrumbHeader
           leading={leadingAction}

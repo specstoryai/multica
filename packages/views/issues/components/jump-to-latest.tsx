@@ -22,6 +22,55 @@ interface JumpToLatestButtonProps {
   stickyComposer: boolean;
   /** Extra classes for the positioned wrapper. */
   className?: string;
+  /**
+   * Performs the jump. When omitted the control scrolls `container` itself
+   * (`scrollContainerToEnd`); the issue view passes a Virtuoso-aware jump.
+   */
+  onJump?: () => void;
+}
+
+/** Frames the settle loop keeps correcting before it gives up. */
+export const SETTLE_MAX_FRAMES = 90;
+/** Consecutive frames the end must stay put before the settle loop stops. */
+const SETTLE_STABLE_FRAMES = 3;
+
+/**
+ * Scroll a container to its end and keep it there while the end moves.
+ *
+ * A virtualized timeline grows as it scrolls: rows below the viewport render
+ * at their estimated height and are re-measured on the way down, so a single
+ * `scrollTo(scrollHeight)` aims at a height that is already stale by the time
+ * it lands, stranding the reader short of the newest comment. This re-targets
+ * the end every animation frame until the height has stopped changing for a
+ * few frames or the frame budget runs out. Returns a cancel function.
+ */
+export function settleScrollAtEnd(container: HTMLElement): () => void {
+  let raf = 0;
+  let frames = 0;
+  let stable = 0;
+  let lastHeight = -1;
+  const step = () => {
+    const end = Math.max(0, container.scrollHeight - container.clientHeight);
+    const atEnd = Math.abs(container.scrollTop - end) <= 1;
+    if (!atEnd) container.scrollTop = end;
+    if (container.scrollHeight === lastHeight && atEnd) stable += 1;
+    else stable = 0;
+    lastHeight = container.scrollHeight;
+    if (stable >= SETTLE_STABLE_FRAMES || ++frames >= SETTLE_MAX_FRAMES) return;
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+  return () => cancelAnimationFrame(raf);
+}
+
+/**
+ * Default jump: one scroll to the end, smooth unless motion is reduced, then
+ * the settle loop so a growing end is still reached.
+ */
+export function scrollContainerToEnd(container: HTMLElement): () => void {
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  container.scrollTo({ top: container.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+  return settleScrollAtEnd(container);
 }
 
 /**
@@ -43,6 +92,7 @@ export function JumpToLatestButton({
   composerRef,
   stickyComposer,
   className,
+  onJump,
 }: JumpToLatestButtonProps) {
   const { t } = useT("issues");
   const isMobile = useIsMobile();
@@ -133,13 +183,20 @@ export function JumpToLatestButton({
     if (visible) place();
   }, [visible, place]);
 
+  const cancelSettleRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => cancelSettleRef.current?.(), []);
+
   const jump = useCallback(() => {
     if (!container) return;
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    container.scrollTo({ top: container.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+    cancelSettleRef.current?.();
+    if (onJump) {
+      onJump();
+    } else {
+      cancelSettleRef.current = scrollContainerToEnd(container);
+    }
     clearIdleTimer();
     setVisible(false);
-  }, [container, clearIdleTimer]);
+  }, [container, onJump, clearIdleTimer]);
 
   const hold = useCallback(() => {
     holdRef.current = true;
