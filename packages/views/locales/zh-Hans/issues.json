@@ -465,6 +465,7 @@
       "close": "关闭查找"
     },
     "jump_to_latest": "跳到最新",
+    "jump_to_top": "跳到顶部",
     "update_failed": "更新任务失败",
     "link_copied": "已复制链接",
     "link_copy_failed": "复制链接失败",

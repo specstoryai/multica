@@ -151,7 +151,7 @@ import { useIssueDetailScrollRestore } from "../hooks/use-issue-detail-scroll-re
 import { useInPageFind } from "../hooks/use-in-page-find";
 import { useStickyComposer } from "../hooks/use-sticky-composer";
 import { FindBar } from "./find-bar";
-import { JumpToLatestButton, settleScrollAtEnd } from "./jump-to-latest";
+import { JumpToLatestButton, scrollContainerToTop, settleScrollAtEnd } from "./jump-to-latest";
 import {
   AnimatedRightSidebar,
   getAnimatedRightSidebarInitialOpen,
@@ -1793,8 +1793,9 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     };
   }, [pendingPostedCommentId, items, replyToRoot, isFlatTimeline]);
 
-  // Jump-to-latest: in Virtuoso mode ask it for the last row aligned to the
-  // end (offset by the pinned composer), then settle on the scroll container.
+  // Jump-to-latest / jump-to-top. The top is stable, so it is one scroll. For
+  // the end, in Virtuoso mode ask it for the last row aligned to the end
+  // (offset by the pinned composer), then settle on the scroll container.
   // The settle loop matters: rows below the viewport render at estimated
   // heights and grow as they are measured on the way down, so a single jump
   // aims at a height that is stale by the time it lands (Runstory finding
@@ -1802,10 +1803,14 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   // no Virtuoso and settles directly.
   const settleAtEndRef = useRef<(() => void) | null>(null);
   useEffect(() => () => settleAtEndRef.current?.(), []);
-  const jumpToLatest = useCallback(() => {
+  const jumpToLatest = useCallback((target: "latest" | "top" = "latest") => {
     const container = scrollContainerEl;
     if (!container) return;
     settleAtEndRef.current?.();
+    if (target === "top") {
+      scrollContainerToTop(container);
+      return;
+    }
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (!isFlatTimeline && virtuosoRef.current && items.length > 0) {
       const composerHeight = stickyComposer

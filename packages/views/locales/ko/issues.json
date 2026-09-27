@@ -467,6 +467,7 @@
       "close": "찾기 닫기"
     },
     "jump_to_latest": "최신으로 이동",
+    "jump_to_top": "맨 위로 이동",
     "update_failed": "태스크를 업데이트하지 못했습니다",
     "link_copied": "링크를 복사했습니다",
     "link_copy_failed": "링크를 복사하지 못했습니다",

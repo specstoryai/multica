@@ -4,9 +4,12 @@ import {
   AT_BOTTOM_THRESHOLD_PX,
   computePlacement,
   contentFits,
+  DIRECTION_MIN_DELTA_PX,
   EDGE_GAP_PX,
   isAtBottom,
+  isAtTop,
   POINTER_OFFSET_PX,
+  resolveJumpTarget,
   shouldReveal,
 } from "./jump-to-latest-state";
 
@@ -87,5 +90,28 @@ describe("computePlacement", () => {
     });
     expect(p.left).toBe(100 + (800 - size.width) / 2);
     expect(p.top).toBe(50 + 600 - size.height - EDGE_GAP_PX);
+  });
+});
+
+describe("resolveJumpTarget", () => {
+  const long = (scrollTop: number) => ({ scrollTop, clientHeight: 600, scrollHeight: 2000 });
+
+  it("offers the newest comment when heading down and the end is off screen", () => {
+    expect(resolveJumpTarget(100, long(300))).toBe("latest");
+  });
+
+  it("offers the top when heading up and the top is off screen", () => {
+    expect(resolveJumpTarget(500, long(300))).toBe("top");
+  });
+
+  it("offers nothing at the end the direction points to", () => {
+    expect(resolveJumpTarget(1300, long(1400))).toBeNull();
+    expect(isAtTop(long(10))).toBe(true);
+    expect(resolveJumpTarget(50, long(10))).toBeNull();
+  });
+
+  it("ignores jitter and content that fits", () => {
+    expect(resolveJumpTarget(300, long(300 + DIRECTION_MIN_DELTA_PX - 1))).toBeNull();
+    expect(resolveJumpTarget(0, { scrollTop: 100, clientHeight: 600, scrollHeight: 600 })).toBeNull();
   });
 });

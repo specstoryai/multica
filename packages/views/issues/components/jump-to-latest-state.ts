@@ -27,6 +27,11 @@ export function isAtBottom(m: ScrollMetrics, threshold = AT_BOTTOM_THRESHOLD_PX)
   return m.scrollHeight - (m.scrollTop + m.clientHeight) <= threshold;
 }
 
+/** True when the viewport shows the start of the content (within the threshold). */
+export function isAtTop(m: ScrollMetrics, threshold = AT_BOTTOM_THRESHOLD_PX): boolean {
+  return m.scrollTop <= threshold;
+}
+
 /** True when there is nothing to scroll to: the content fits the viewport. */
 export function contentFits(m: ScrollMetrics): boolean {
   return m.scrollHeight <= m.clientHeight + 1;
@@ -38,6 +43,26 @@ export function contentFits(m: ScrollMetrics): boolean {
  */
 export function shouldReveal(m: ScrollMetrics): boolean {
   return !contentFits(m) && !isAtBottom(m);
+}
+
+/** Which way the control jumps: to the newest comment or back to the top. */
+export type JumpTarget = "latest" | "top";
+
+/** Scroll movements smaller than this are jitter, not a direction. */
+export const DIRECTION_MIN_DELTA_PX = 2;
+
+/**
+ * The jump a scroll event should offer, from the direction of travel: heading
+ * down offers the newest comment, heading up offers the top. Null when there is
+ * nothing to offer: no overflow, a movement too small to read as a direction,
+ * or already at the end the direction points to.
+ */
+export function resolveJumpTarget(previousScrollTop: number, m: ScrollMetrics): JumpTarget | null {
+  if (contentFits(m)) return null;
+  const delta = m.scrollTop - previousScrollTop;
+  if (Math.abs(delta) < DIRECTION_MIN_DELTA_PX) return null;
+  if (delta > 0) return isAtBottom(m) ? null : "latest";
+  return isAtTop(m) ? null : "top";
 }
 
 export type PlacementMode = "pointer" | "bottom";

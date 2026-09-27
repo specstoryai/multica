@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
 import { useIsMobile } from "@multica/ui/hooks/use-mobile";
 import { cn } from "@multica/ui/lib/utils";
@@ -9,7 +9,8 @@ import { useT } from "../../i18n";
 import {
   computePlacement,
   HIDE_AFTER_IDLE_MS,
-  shouldReveal,
+  resolveJumpTarget,
+  type JumpTarget,
   type PlacementMode,
 } from "./jump-to-latest-state";
 
@@ -24,9 +25,10 @@ interface JumpToLatestButtonProps {
   className?: string;
   /**
    * Performs the jump. When omitted the control scrolls `container` itself
-   * (`scrollContainerToEnd`); the issue view passes a Virtuoso-aware jump.
+   * (`scrollContainerToEnd` / `scrollContainerToTop`); the issue view passes
+   * a Virtuoso-aware jump.
    */
-  onJump?: () => void;
+  onJump?: (target: JumpTarget) => void;
 }
 
 /** Frames the settle loop keeps correcting before it gives up. */
@@ -63,24 +65,33 @@ export function settleScrollAtEnd(container: HTMLElement): () => void {
   return () => cancelAnimationFrame(raf);
 }
 
+function prefersReducedMotion(): boolean {
+  return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
 /**
  * Default jump: one scroll to the end, smooth unless motion is reduced, then
  * the settle loop so a growing end is still reached.
  */
 export function scrollContainerToEnd(container: HTMLElement): () => void {
-  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  container.scrollTo({ top: container.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+  container.scrollTo({ top: container.scrollHeight, behavior: prefersReducedMotion() ? "auto" : "smooth" });
   return settleScrollAtEnd(container);
+}
+
+/** Default jump to the top. The top does not move, so no settling is needed. */
+export function scrollContainerToTop(container: HTMLElement): void {
+  container.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
 }
 
 /**
  * Floating "jump to latest" control for the issue timeline.
  *
- * Hidden at rest. A scroll that leaves the end of the timeline off screen
- * reveals it; it fades out once scrolling has been idle for a moment, or as
- * soon as the end is on screen, so it never sits over the content. With a
- * mouse it appears just below-right of the cursor, where the hand already is;
- * on a narrow viewport or a coarse pointer it appears centred near the bottom.
+ * Hidden at rest. Scrolling reveals it, pointing the way the reader is
+ * heading: down offers the newest comment, up offers the top, and nothing is
+ * offered once that end is already on screen. It fades out once scrolling has
+ * been idle for a moment, so it never sits over the content. With a mouse it
+ * appears just below-right of the cursor, where the hand already is; on a
+ * narrow viewport or a coarse pointer it appears centred near the bottom.
  * Hover or focus holds it visible.
  *
  * Positioned absolutely inside the content column (the same parent as the
@@ -101,6 +112,8 @@ export function JumpToLatestButton({
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdRef = useRef(false);
   const [visible, setVisible] = useState(false);
+  const [target, setTarget] = useState<JumpTarget>("latest");
+  const lastScrollTopRef = useRef<number | null>(null);
   const [placement, setPlacement] = useState<{ left: number; top: number } | null>(null);
 
   const mode: PlacementMode = isMobile || hasCoarsePointer() ? "bottom" : "pointer";
@@ -152,15 +165,21 @@ export function JumpToLatestButton({
     );
   }, [container, composerRef, mode, stickyComposer]);
 
-  // Scroll reveals; idle hides; reaching the end hides at once.
+  // Scroll reveals; idle hides; reaching the end hides at once. The position
+  // at attach time seeds the direction so the very first scroll already reads.
   useEffect(() => {
     if (!container) return;
+    lastScrollTopRef.current = container.scrollTop;
     const onScroll = () => {
-      if (!shouldReveal(container)) {
+      const previous = lastScrollTopRef.current ?? container.scrollTop;
+      lastScrollTopRef.current = container.scrollTop;
+      const next = resolveJumpTarget(previous, container);
+      if (!next) {
         clearIdleTimer();
         setVisible(false);
         return;
       }
+      setTarget(next);
       setVisible(true);
       place();
       armIdleTimer();
@@ -190,13 +209,15 @@ export function JumpToLatestButton({
     if (!container) return;
     cancelSettleRef.current?.();
     if (onJump) {
-      onJump();
+      onJump(target);
+    } else if (target === "top") {
+      scrollContainerToTop(container);
     } else {
       cancelSettleRef.current = scrollContainerToEnd(container);
     }
     clearIdleTimer();
     setVisible(false);
-  }, [container, onJump, clearIdleTimer]);
+  }, [container, onJump, target, clearIdleTimer]);
 
   const hold = useCallback(() => {
     holdRef.current = true;
@@ -208,7 +229,7 @@ export function JumpToLatestButton({
     if (visible) armIdleTimer();
   }, [visible, armIdleTimer]);
 
-  const label = t(($) => $.detail.jump_to_latest);
+  const label = target === "top" ? t(($) => $.detail.jump_to_top) : t(($) => $.detail.jump_to_latest);
 
   return (
     <div
@@ -216,6 +237,7 @@ export function JumpToLatestButton({
       data-testid="jump-to-latest"
       data-state={visible ? "visible" : "hidden"}
       data-placement={mode}
+      data-target={target}
       aria-hidden={!visible}
       className={cn(
         "absolute z-30 transition-opacity duration-200 motion-reduce:transition-none",
@@ -238,7 +260,7 @@ export function JumpToLatestButton({
         className="rounded-full shadow-md"
         onClick={jump}
       >
-        <ArrowDown />
+        {target === "top" ? <ArrowUp /> : <ArrowDown />}
       </Button>
     </div>
   );

@@ -32,6 +32,14 @@ function makeContainer(metrics: { scrollTop: number; clientHeight: number; scrol
   return el;
 }
 
+/** Move the container to `top` and fire the scroll event, like a real scroll. */
+function scrollTo(container: HTMLElement, top: number) {
+  container.scrollTop = top;
+  act(() => {
+    fireEvent.scroll(container);
+  });
+}
+
 function renderButton(container: HTMLElement | null, sticky = false) {
   const composerRef = createRef<HTMLElement>();
   return renderWithI18n(
@@ -66,11 +74,10 @@ describe("JumpToLatestButton", () => {
   it("appears on scroll away from the end and fades after idle", () => {
     const container = makeContainer({ scrollTop: 0, clientHeight: 600, scrollHeight: 2000 });
     renderButton(container);
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 300);
     const wrapper = screen.getByTestId("jump-to-latest");
     expect(wrapper).toHaveAttribute("data-state", "visible");
+    expect(wrapper).toHaveAttribute("data-target", "latest");
     expect(screen.getByRole("button", { name: "Jump to latest" })).toHaveAttribute("tabindex", "0");
 
     act(() => {
@@ -84,36 +91,54 @@ describe("JumpToLatestButton", () => {
   });
 
   it("stays hidden when the end of the timeline is already on screen", () => {
-    const metrics = { scrollTop: 1400, clientHeight: 600, scrollHeight: 2000 };
+    const metrics = { scrollTop: 1300, clientHeight: 600, scrollHeight: 2000 };
     const container = makeContainer(metrics);
     renderButton(container);
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 1400);
     expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-state", "hidden");
+  });
+
+  it("offers the top when scrolling up, and nothing once the top is on screen", () => {
+    const metrics = { scrollTop: 1000, clientHeight: 600, scrollHeight: 2000 };
+    const container = makeContainer(metrics);
+    renderButton(container);
+    scrollTo(container, 700);
+    const wrapper = screen.getByTestId("jump-to-latest");
+    expect(wrapper).toHaveAttribute("data-state", "visible");
+    expect(wrapper).toHaveAttribute("data-target", "top");
+    fireEvent.click(screen.getByRole("button", { name: "Jump to top" }));
+    expect(container.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+    expect(wrapper).toHaveAttribute("data-state", "hidden");
+    scrollTo(container, 10);
+    scrollTo(container, 0);
+    expect(wrapper).toHaveAttribute("data-state", "hidden");
+  });
+
+  it("switches target with the direction of travel", () => {
+    const metrics = { scrollTop: 500, clientHeight: 600, scrollHeight: 2000 };
+    const container = makeContainer(metrics);
+    renderButton(container);
+    scrollTo(container, 800);
+    expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-target", "latest");
+    scrollTo(container, 600);
+    expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-target", "top");
+    expect(screen.getByRole("button", { name: "Jump to top" })).toBeInTheDocument();
   });
 
   it("hides as soon as a scroll reaches the end", () => {
     const metrics = { scrollTop: 0, clientHeight: 600, scrollHeight: 2000 };
     const container = makeContainer(metrics);
     renderButton(container);
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 300);
     expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-state", "visible");
-    metrics.scrollTop = 1400;
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 1400);
     expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-state", "hidden");
   });
 
   it("holds while hovered, then fades after leaving", () => {
     const container = makeContainer({ scrollTop: 0, clientHeight: 600, scrollHeight: 2000 });
     renderButton(container);
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 300);
     const wrapper = screen.getByTestId("jump-to-latest");
     fireEvent.pointerEnter(wrapper);
     act(() => {
@@ -130,9 +155,7 @@ describe("JumpToLatestButton", () => {
   it("scrolls the container to its end on click and hides", () => {
     const container = makeContainer({ scrollTop: 0, clientHeight: 600, scrollHeight: 2000 });
     renderButton(container);
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 300);
     fireEvent.click(screen.getByRole("button", { name: "Jump to latest" }));
     expect(container.scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: "smooth" });
     expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-state", "hidden");
@@ -146,9 +169,7 @@ describe("JumpToLatestButton", () => {
     })) as unknown as typeof window.matchMedia;
     const container = makeContainer({ scrollTop: 0, clientHeight: 600, scrollHeight: 2000 });
     renderButton(container);
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 300);
     fireEvent.click(screen.getByRole("button", { name: "Jump to latest" }));
     expect(container.scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: "auto" });
   });
@@ -157,17 +178,13 @@ describe("JumpToLatestButton", () => {
     const container = makeContainer({ scrollTop: 0, clientHeight: 600, scrollHeight: 2000 });
     const { unmount } = renderButton(container);
     fireEvent.pointerMove(container, { clientX: 300, clientY: 200 });
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 300);
     expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-placement", "pointer");
     unmount();
 
     setViewportWidth(390);
     renderButton(container);
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 300);
     expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-placement", "bottom");
   });
   it("calls onJump instead of scrolling itself when provided", () => {
@@ -177,11 +194,9 @@ describe("JumpToLatestButton", () => {
     renderWithI18n(
       <JumpToLatestButton container={container} composerRef={composerRef} stickyComposer={false} onJump={onJump} />,
     );
-    act(() => {
-      fireEvent.scroll(container);
-    });
+    scrollTo(container, 300);
     fireEvent.click(screen.getByRole("button", { name: "Jump to latest" }));
-    expect(onJump).toHaveBeenCalledTimes(1);
+    expect(onJump).toHaveBeenCalledWith("latest");
     expect(container.scrollTo).not.toHaveBeenCalled();
     expect(screen.getByTestId("jump-to-latest")).toHaveAttribute("data-state", "hidden");
   });
