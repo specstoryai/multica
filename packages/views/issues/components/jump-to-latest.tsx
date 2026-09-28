@@ -74,13 +74,48 @@ function prefersReducedMotion(): boolean {
  * the settle loop so a growing end is still reached.
  */
 export function scrollContainerToEnd(container: HTMLElement): () => void {
-  container.scrollTo({ top: container.scrollHeight, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  const distance = container.scrollHeight - container.clientHeight - container.scrollTop;
+  container.scrollTo({ top: container.scrollHeight, behavior: jumpBehavior(container, distance) });
   return settleScrollAtEnd(container);
 }
 
-/** Default jump to the top. The top does not move, so no settling is needed. */
-export function scrollContainerToTop(container: HTMLElement): void {
-  container.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+/** Beyond this many viewports the jump is instant: a smooth scroll that far is
+ * slow, and inside a virtualized list it is interrupted as rows above the
+ * viewport mount and unmount and shift the scroll position under it. */
+export const SMOOTH_MAX_VIEWPORTS = 2;
+
+function jumpBehavior(container: HTMLElement, distance: number): ScrollBehavior {
+  if (prefersReducedMotion()) return "auto";
+  return distance > container.clientHeight * SMOOTH_MAX_VIEWPORTS ? "auto" : "smooth";
+}
+
+/**
+ * Hold a container at its top while the layout above settles. Rows a
+ * virtualized list unmounts on the way up shift the position after the jump,
+ * so re-target 0 each frame until it has held still for a few frames.
+ */
+export function settleScrollAtTop(container: HTMLElement): () => void {
+  let raf = 0;
+  let frames = 0;
+  let stable = 0;
+  const step = () => {
+    if (container.scrollTop > 1) {
+      container.scrollTop = 0;
+      stable = 0;
+    } else {
+      stable += 1;
+    }
+    if (stable >= SETTLE_STABLE_FRAMES || ++frames >= SETTLE_MAX_FRAMES) return;
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+  return () => cancelAnimationFrame(raf);
+}
+
+/** Default jump to the top: one scroll, then hold the top while rows above settle. */
+export function scrollContainerToTop(container: HTMLElement): () => void {
+  container.scrollTo({ top: 0, behavior: jumpBehavior(container, container.scrollTop) });
+  return settleScrollAtTop(container);
 }
 
 /**
@@ -211,7 +246,7 @@ export function JumpToLatestButton({
     if (onJump) {
       onJump(target);
     } else if (target === "top") {
-      scrollContainerToTop(container);
+      cancelSettleRef.current = scrollContainerToTop(container);
     } else {
       cancelSettleRef.current = scrollContainerToEnd(container);
     }

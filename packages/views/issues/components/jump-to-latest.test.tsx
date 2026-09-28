@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { renderWithI18n } from "../../test/i18n";
-import { JumpToLatestButton, SETTLE_MAX_FRAMES, settleScrollAtEnd } from "./jump-to-latest";
+import { JumpToLatestButton, SETTLE_MAX_FRAMES, settleScrollAtEnd, settleScrollAtTop, SMOOTH_MAX_VIEWPORTS } from "./jump-to-latest";
 import { HIDE_AFTER_IDLE_MS } from "./jump-to-latest-state";
 
 // Component wiring for the timeline's jump-to-latest control: hidden at rest,
@@ -255,5 +255,48 @@ describe("settleScrollAtEnd", () => {
       vi.advanceTimersByTime(16 * 10);
     });
     expect(rafSpy).not.toHaveBeenCalled();
+    // Restore, or later tests would drive a stale fake clock through the spy.
+    rafSpy.mockRestore();
+  });
+});
+
+describe("settleScrollAtTop", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.innerHTML = "";
+  });
+
+  // A virtualized list unmounting rows above the viewport pushes the position
+  // back down after a jump to the top; the loop must hold it at 0.
+  it("re-targets the top while rows above shift the position", () => {
+    const metrics = { scrollTop: 53686, clientHeight: 800, scrollHeight: 60000 };
+    const container = makeContainer(metrics);
+    let pushes = 3;
+    Object.defineProperty(container, "scrollTop", {
+      configurable: true,
+      get: () => metrics.scrollTop,
+      set: (v: number) => {
+        // The first few frames the layout shifts the position down again.
+        metrics.scrollTop = pushes-- > 0 ? v + 1200 : v;
+      },
+    });
+    settleScrollAtTop(container);
+    act(() => {
+      vi.advanceTimersByTime(16 * 20);
+    });
+    expect(metrics.scrollTop).toBe(0);
+  });
+
+  it("jumps instantly when the distance exceeds a couple of viewports", () => {
+    const container = makeContainer({ scrollTop: 800 * (SMOOTH_MAX_VIEWPORTS + 1), clientHeight: 800, scrollHeight: 60000 });
+    renderWithI18n(
+      <JumpToLatestButton container={container} composerRef={createRef<HTMLElement>()} stickyComposer={false} />,
+    );
+    scrollTo(container, 800 * SMOOTH_MAX_VIEWPORTS + 400);
+    fireEvent.click(screen.getByRole("button", { name: "Jump to top" }));
+    expect(container.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
   });
 });

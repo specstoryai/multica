@@ -170,7 +170,7 @@ import { useIssueDetailScrollRestore } from "../hooks/use-issue-detail-scroll-re
 import { useInPageFind } from "../hooks/use-in-page-find";
 import { useStickyComposer } from "../hooks/use-sticky-composer";
 import { FindBar } from "./find-bar";
-import { JumpToLatestButton, scrollContainerToTop, settleScrollAtEnd } from "./jump-to-latest";
+import { JumpToLatestButton, scrollContainerToTop, settleScrollAtEnd, SMOOTH_MAX_VIEWPORTS } from "./jump-to-latest";
 import {
   AnimatedRightSidebar,
   getAnimatedRightSidebarInitialOpen,
@@ -1874,9 +1874,11 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     };
   }, [pendingPostedCommentId, items, replyToRoot, isFlatTimeline]);
 
-  // Jump-to-latest / jump-to-top. The top is stable, so it is one scroll. For
-  // the end, in Virtuoso mode ask it for the last row aligned to the end
-  // (offset by the pinned composer), then settle on the scroll container.
+  // Jump-to-latest / jump-to-top. Both scroll once, instantly when the
+  // distance is more than a couple of viewports (a smooth scroll that far is
+  // slow and Virtuoso interrupts it), then settle. For the end, in Virtuoso
+  // mode ask it for the last row aligned to the end (offset by the pinned
+  // composer) before settling on the scroll container.
   // The settle loop matters: rows below the viewport render at estimated
   // heights and grow as they are measured on the way down, so a single jump
   // aims at a height that is stale by the time it lands (Runstory finding
@@ -1889,10 +1891,13 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     if (!container) return;
     settleAtEndRef.current?.();
     if (target === "top") {
-      scrollContainerToTop(container);
+      settleAtEndRef.current = scrollContainerToTop(container);
       return;
     }
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const distance = container.scrollHeight - container.clientHeight - container.scrollTop;
+    const behavior: ScrollBehavior =
+      reduced || distance > container.clientHeight * SMOOTH_MAX_VIEWPORTS ? "auto" : "smooth";
     if (!isFlatTimeline && virtuosoRef.current && items.length > 0) {
       const composerHeight = stickyComposer
         ? composerRef.current?.getBoundingClientRect().height ?? 0
@@ -1901,10 +1906,10 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
         index: items.length - 1,
         align: "end",
         offset: composerHeight,
-        behavior: reduced ? "auto" : "smooth",
+        behavior,
       });
     } else {
-      container.scrollTo({ top: container.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+      container.scrollTo({ top: container.scrollHeight, behavior });
     }
     settleAtEndRef.current = settleScrollAtEnd(container);
   }, [scrollContainerEl, isFlatTimeline, items.length, stickyComposer]);
