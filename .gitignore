@@ -79,6 +79,9 @@ data/
 __pycache__/
 *.pyc
 perf-report/
+# The production example is a tracked template; `.env*` above would hide it.
+!apps/mobile/.env.production.example
+
 # runstory: per machine state under .runstory/state/, the last failed dispatch in .runstory/dispatch.last and the delivered values in .runstory/env. .runstory/findings.json and .runstory/repro/ are NOT ignored, because the findings queue belongs to the branch.
 .runstory/runs/
 .runstory/state/
